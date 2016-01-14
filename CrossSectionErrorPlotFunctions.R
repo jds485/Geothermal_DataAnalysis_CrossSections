@@ -3,6 +3,7 @@
 #Typically, sorting the cross section points by latitude or longitude will properly sort the data for cross sections that are not too complex. 
 
 library(rgdal)
+library(graphics)
 
 #This function deals with jaggedness along a cross section that results from extraction of raster values to points along a line feature.
 #The points may jump from one boundary to another and back, so this function switches the order of points to make a smooth cross section.
@@ -433,8 +434,10 @@ dev.off()
 
 #### Reservoirs ####
 
-#Function for placing reservoirs onto the cross section plots
-#Currently, only the reservoir depth is plotted, rather than the thickness of the whole reservoir.
+#Function for placing reservoirs onto the cross section plots.
+#The rectangle option can likely be improved by recording the joints of the lines as points, and then when the reservoir terminates, use lines() to connect them all.
+#It's important to note that if this function is used along with the SortMixedIntegerBounds, the points that are switched will need to have their data switched back for the reservoirs to plot properly. Example below for important parameters.
+#Currently does not handle if there are two reservoirs at the same depth with different formation thicknesses 
 PlotReservoirs = function(CrossSec,           #Cross section name
                           ResData,            #Database containing the reservoir information
                           Res,                #Field used to indicate presence of a reservoir
@@ -448,12 +451,13 @@ PlotReservoirs = function(CrossSec,           #Cross section name
                           colResTop = 'blue', #Color of the top of the reservoir for points option (Rects = 0)
                           colResBot = 'green',#Color of the bottom of the reservoir for points option (Rects = 0)
                           colMean = 'blue',   #Color indicating presence of a reservoir on the mean line
+                          transpar = 0.3,     #Transparency parameter for the rectangles
                           xLimMin,            #x-axis start
                           xLimMax,            #x-axis stop
                           yLimBot,            #y-axis value at bottom
                           yLimTop             #y-axis Value at top
 ){
-  
+  RemResInds = NA
   if (is.na(Depth)){
     #This is for plotting the blue sections along the mean line.
     PlotBack = -1
@@ -464,7 +468,7 @@ PlotReservoirs = function(CrossSec,           #Cross section name
         if (CrossSec@data[Res][i,] == 0){
           #This means that the reservoir section has ended. Plot the data back to PlotBack
           par(new=T)
-          plot(CrossSec@data$Length[PlotBack:i-1], CrossSec@data[Thermal][PlotBack:i-1,], col=colMean, type='l', xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab="", ylab="", lwd=2, axes=FALSE)
+          plot(CrossSec@data$Length[PlotBack:(i-1)], CrossSec@data[Thermal][PlotBack:(i-1),], col=colMean, type='l', xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab="", ylab="", lwd=2, axes=FALSE)
           
           #Set PlotBack to -1
           PlotBack = -1
@@ -485,10 +489,14 @@ PlotReservoirs = function(CrossSec,           #Cross section name
       for (i in 1:length(CrossSec@data$Length)){
         #If there are reservoirs at this location, plot them at their depth.
         if (PlotBack != -1){
-          ResSpotCheck = ResData@data[which(ResData$Length == CrossSec@data$Length[i]),]
+          ResSpotCheck = ResData@data[which(ResData@data$Length == CrossSec@data$Length[i]),]
+          ResSpotCheck$Start = -1
           if (length(ResSpotCheck)>0){
             Inds2 = which(ResSpotCheck[Depth][,1]==0)
-            ResSpotCheck[-Inds2,]
+            if (length(Inds2) > 0){
+              #Remove reservoirs with 0 depth
+              ResSpotCheck = ResSpotCheck[-Inds2,]
+            }
           }
           if (CrossSec@data[Res][i,] != 0){
             if (Rects == 0){
@@ -498,11 +506,58 @@ PlotReservoirs = function(CrossSec,           #Cross section name
               plot(rep(CrossSec@data$Length[i], length(ResSpotCheck[Depth][,1])), ResSpotCheck[Depth][,1]+ResSpotCheck[FormThick][,1], axes=FALSE, xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=colResBot, pch=16)
             }
             else if (Rects == 1){
-              #Figure out a good way to plot rectangles.
+              #The reservoirs could go back to ResSpot$Start, but not all reservoirs have to continue. Check to see if all reservoirs in ResSpot exist here.
+              if (length(ResSpot$Start) > 0){
+                #The reservoir could be continued from the previous set of reservoirs
+                for (j in 1:length(ResSpot[Depth][,1])){
+                  if (any((ResSpotCheck[Depth][,1] == ResSpot[Depth][j,1])) == FALSE){
+                    #This reservoir has terminated. Plot it back to the ResSpot$Start location.
+                    par(new=T)
+                    rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                    #Remove this reservoir from ResSpot after loop concludes
+                    if (length(RemResInds) > 1){
+                      RemResInds = c(RemResInds, j)
+                    }
+                    else if (is.na(RemResInds)){
+                      RemResInds = j
+                    }
+                    else{
+                      RemResInds = c(RemResInds, j)
+                    }
+                  }
+                }
+              }
+              #Now check to see if there are any new reservoirs that begin and add them to the ResSpot.
+              for (k in 1:length(ResSpotCheck[Depth][,1])){
+                if (any(ResSpot[Depth][,1] == ResSpotCheck[Depth][k,1]) == FALSE){
+                  #Add this reservoir to ResSpot with the new start location.
+                  ResSpotCheck$Start[k] = (i-1)
+                  ResSpot = rbind(ResSpot, ResSpotCheck[k,])                  
+                }
+              }
+              #Remove reservoirs that terminated.
+              if (length(RemResInds) > 1){
+                ResSpot = ResSpot[-RemResInds,]
+                #Set RemResInds back to NA
+                RemResInds = NA
+              }
+              else if (is.na(RemResInds) == FALSE){
+                ResSpot = ResSpot[-RemResInds,]
+                #Set RemResInds back to NA
+                RemResInds = NA
+              }
               
             }
           }
           if (CrossSec@data[Res][i,] == 0){
+            if (length(ResSpot$Start) > 0){
+              #The reservoir could be continued from the previous set of reservoirs
+              for (j in 1:length(ResSpot[Depth][,1])){
+                #This reservoir has terminated. Plot it back to the ResSpot$Start location.
+                par(new=T)
+                rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+              }
+            }
             #Set PlotBack to 0 and clear contents of ResSpot
             PlotBack = -1
             ResSpot = NA
@@ -519,7 +574,7 @@ PlotReservoirs = function(CrossSec,           #Cross section name
           }
           else if (any(ResSpot[Depth][,1] == 0)){
             Inds = which(ResSpot[Depth][,1]==0)
-            ResSpot[-Inds,]
+            ResSpot = ResSpot[-Inds,]
             if (Rects == 0){
               par(new=T)
               plot(rep(CrossSec@data$Length[i], length(ResSpot[Depth][,1])), ResSpot[Depth][,1], axes=FALSE, xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=colResTop, pch=16)
@@ -527,7 +582,8 @@ PlotReservoirs = function(CrossSec,           #Cross section name
               plot(rep(CrossSec@data$Length[i], length(ResSpot[Depth][,1])), ResSpot[Depth][,1]+ResSpot[FormThick][,1], axes=FALSE, xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=colResBot, pch=16)
             }
             else if (Rects == 1){
-              
+              #Do not plot anything. Record the position of the start of the reservoir for each reservoir.
+              ResSpot$Start = (i-1)
             }
           }
           else{
@@ -538,7 +594,8 @@ PlotReservoirs = function(CrossSec,           #Cross section name
               plot(rep(CrossSec@data$Length[i], length(ResSpot[Depth][,1])), ResSpot[Depth][,1]+ResSpot[FormThick][,1], axes=FALSE, xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=colResBot, pch=16)
             }
             else if (Rects == 1){
-              
+              #Do not plot anything. Record the position of the start of the reservoir for each reservoir.
+              ResSpot$Start = (i-1)
             }
           }
         }
@@ -556,12 +613,19 @@ PlotReservoirs = function(CrossSec,           #Cross section name
       for (i in 1:length(CrossSec@data$Length)){
         #If there are reservoirs at this location, plot them at their depth.
         if (PlotBack != -1){
-          ResSpotCheck = ResData@data[which(ResData$Length == CrossSec@data$Length[i]),]
-          if (length(ResSpotCheck)>0){
+          #Gather reservoirs at the new location.
+          ResSpotCheck = ResData@data[which(ResData@data$Length == CrossSec@data$Length[i]),]
+          ResSpotCheck$Start = -1
+          if (length(ResSpotCheck[,1])>0){
             Inds2 = which(ResSpotCheck[Depth][,1]==0)
-            ResSpotCheck[-Inds2,]
+            if (length(Inds2) > 0){
+              #Remove reservoirs with 0 depth
+              ResSpotCheck = ResSpotCheck[-Inds2,]
+              #May need to check if all rows were deleted.
+            }
           }
-          if (CrossSec@data[Res][i,] != 0){
+          if (CrossSec@data[Res][,1][i] != 0){
+            #There are reservoirs in this location.
             if (Rects == 0){
               par(new=T)
               plot(rep(CrossSec@data$Length[i], length(ResSpotCheck[Depth][,1])), ResSpotCheck[Depth][,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), axes=FALSE, xlab='', ylab='', col=colResTop, pch=16)
@@ -569,46 +633,100 @@ PlotReservoirs = function(CrossSec,           #Cross section name
               plot(rep(CrossSec@data$Length[i], length(ResSpotCheck[Depth][,1])), ResSpotCheck[Depth][,1]+ResSpotCheck[FormThick][,1], axes=FALSE, xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=colResBot, pch=16)
             }
             else if (Rects == 1){
-              
+              #The reservoirs could go back to ResSpot$Start, but not all reservoirs have to continue. Check to see if all reservoirs in ResSpot exist here.
+              if (length(ResSpot$Start) > 0){
+                #The reservoir could be continued from the previous set of reservoirs
+                for (j in 1:length(ResSpot[Depth][,1])){
+                  if (any((ResSpotCheck[Depth][,1] == ResSpot[Depth][j,1])) == FALSE){
+                    #This reservoir has terminated. Plot it back to the ResSpot$Start location.
+                    par(new=T)
+                    rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                    #Remove this reservoir from ResSpot after loop concludes
+                    if (length(RemResInds) > 1){
+                      RemResInds = c(RemResInds, j)
+                    }
+                    else if (is.na(RemResInds)){
+                      RemResInds = j
+                    }
+                    else{
+                      RemResInds = c(RemResInds, j)
+                    }
+                  }
+                }
+              }
+              #Now check to see if there are any new reservoirs that begin and add them to the ResSpot.
+              for (k in 1:length(ResSpotCheck[Depth][,1])){
+                if (any(ResSpot[Depth][,1] == ResSpotCheck[Depth][k,1]) == FALSE){
+                  #Add this reservoir to ResSpot with the new start location.
+                  ResSpotCheck$Start[k] = (i-1)
+                  ResSpot = rbind(ResSpot, ResSpotCheck[k,])                  
+                }
+              }
+              #Remove reservoirs that terminated.
+              if (length(RemResInds) > 1){
+                ResSpot = ResSpot[-RemResInds,]
+                #Set RemResInds back to NA
+                RemResInds = NA
+              }
+              else if (is.na(RemResInds) == FALSE){
+                ResSpot = ResSpot[-RemResInds,]
+                #Set RemResInds back to NA
+                RemResInds = NA
+              }
             }
           }
           if (CrossSec@data[Res][i,] == 0){
-            #Set PlotBack to 0 and clear contents of ResSpot
+            if (length(ResSpot$Start) > 0){
+              #The reservoir could be continued from the previous set of reservoirs
+              for (j in 1:length(ResSpot[Depth][,1])){
+                #This reservoir has terminated. Plot it back to the ResSpot$Start location.
+                par(new=T)
+                rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+              }
+            }
+            #Clearly all reservoirs have terminated. Set PlotBack to 0 and clear contents of ResSpot.
             PlotBack = -1
             ResSpot = NA
           }
         }
-        else if (CrossSec@data[Res][i,] > 0){
-          #Used to check for how far the reservoirs are present
+        else if (CrossSec@data[Res][i,] != 0){
+          #There are reservoirs here. Set PltBack to i. Used to check for how far the reservoirs are present
           PlotBack = i
           #Get all the reservoirs at this spot from the database
-          ResSpot = ResData@data[which(ResData$Length == CrossSec@data$Length[i]),]
+          ResSpot = ResData@data[which(ResData@data$Length == CrossSec@data$Length[i]),]
           if (all(ResSpot[Depth][,1] == 0)){
+            #No reservoirs exist here. Error in data input file.
             PlotBack = -1
             ResSpot = NA
           }
           else if (any(ResSpot[Depth][,1] == 0)){
+            #Some reservoirs have 0 depth. Remove them.
             Inds = which(ResSpot[Depth][,1]==0)
-            ResSpot[-Inds,]
+            ResSpot = ResSpot[-Inds,]
             if (Rects == 0){
+              #Plot the reservoirs that do not have 0 depth.
               par(new=T)
               plot(rep(CrossSec@data$Length[i], length(ResSpot[Depth][,1])), ResSpot[Depth][,1], axes=FALSE, xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=colResTop, pch=16)
               par(new=T)
               plot(rep(CrossSec@data$Length[i], length(ResSpot[Depth][,1])), ResSpot[Depth][,1]+ResSpot[FormThick][,1], axes=FALSE, xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=colResBot, pch=16)
             }
             else if (Rects == 1){
-              
+              #Do not plot anything. Record the position of the start of the reservoir for each reservoir.
+              ResSpot$Start = (i-1)
             }
           }
           else{
+            #All depths are fine.
             if (Rects == 0){
+              #Plot the reservoirs
               par(new=T)
               plot(rep(CrossSec@data$Length[i], length(ResSpot[Depth][,1])), ResSpot[Depth][,1], axes=FALSE, xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=colResTop, pch=16)
               par(new=T)
               plot(rep(CrossSec@data$Length[i], length(ResSpot[Depth][,1])), ResSpot[Depth][,1]+ResSpot[FormThick][,1], axes=FALSE, xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=colResBot, pch=16)
             }
             else if (Rects == 1){
-              
+              #Do not plot anything. Record the position of the start of the reservoir for each reservoir.
+              ResSpot$Start = (i-1)
             }
           }
         }
@@ -629,6 +747,9 @@ for (i in 1:length(XSA_sort$POINT_Y)){
 }
 rm(i)
 XSA_sort = SortMixedIntBounds(XSA_sort, "WormSect", "Length")
+XSA_sort$FmnThickm = XSA$FmnThickm
+XSA_sort$ThickUncer = XSA$ThickUncer
+XSA_sort$ResDepthm = XSA$ResDepthm
 
 #Load reservoir data along the cross section. This file must have a Length field that corresponds to the cross section.
 ResData = readOGR(dsn=getwd(), layer="XSA_pts_Res1p5", stringsAsFactors=FALSE)
@@ -670,7 +791,22 @@ rm(i)
 
 #Plot of the reservoirs
 #Use mar if a reservoir depth axis is to be added.
-png(filename="ExampleCrossSection_ReservoirsAdded_SingleAxis.png", width = 14, height = 6, units="in", res=300)
+png(filename="ExampleCrossSection_ReservoirsAdded_SingleAxis_Rectangles.png", width = 14, height = 6, units="in", res=300)
+par(mgp=c(2.5,0.8,0), mar = c(5,4,4,5))
+plot(XSA_sort$Length, XSA_sort$D100C_Pred, type = 'l', xlim=c(0,1100), ylim = c(8000, -500), main=expression(paste("Depth to 100 ",degree,"C Along Cross Section A-A'")), xlab="Distance (km)", ylab="Depth (m)", lwd=2, cex.lab=1.8, cex.axis=1.8,cex.main=1.5)
+axis(1, at=seq(100,1100,200), labels=seq(100,1100,200), cex.axis=1.8)
+minor.tick(nx=4, ny=2, tick.ratio=0.5)
+par(new=T)
+ErrorBarXC2(CrossSec=XSA_sort, PredVar="D100C_Pred", ErrVar="D100C_Err", xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500, IntBoundLen=0.25, IntBoundNames="WormSect", LinWidBound=1, BoundExtend=0.1)
+StateName = c('West Virginia', '', 'Pennsylvania', 'New York')
+NameStates(XSA_sort, StateName, -450, -400, 50, 300, "A", 1.5)
+text(x=(XSA_sort$Length[which(XSA_sort$STATEFP == 24)][1]+XSA_sort$Length[which(XSA_sort$STATEFP == 42)][1])/2, y=-600, "MD", cex=0.85)
+legend(-70,5500,legend=c(expression(paste('Predicted Mean (',hat(mu),")")), expression(paste(hat(mu) %+-% 2, "SE")), "Interpolation Boundary"), lty=c(1,2,2), lwd=c(2,2,1), col=c('black','red','black'), bty="n", cex=1.5, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', Depth = 'ResDepthm', FormThick = 'FmnThickm', NewAxis = NA, Rects=1, yResBot=4000, yResTop=0, xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
+dev.off()
+
+png(filename="ExampleCrossSection_ReservoirsAdded_SingleAxis_Points.png", width = 14, height = 6, units="in", res=300)
 par(mgp=c(2.5,0.8,0), mar = c(5,4,4,5))
 plot(XSA_sort$Length, XSA_sort$D100C_Pred, type = 'l', xlim=c(0,1100), ylim = c(8000, -500), main=expression(paste("Depth to 100 ",degree,"C Along Cross Section A-A'")), xlab="Distance (km)", ylab="Depth (m)", lwd=2, cex.lab=1.8, cex.axis=1.8,cex.main=1.5)
 axis(1, at=seq(100,1100,200), labels=seq(100,1100,200), cex.axis=1.8)
@@ -686,7 +822,23 @@ PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Therm
 dev.off()
 
 
-png(filename="ExampleCrossSection_ReservoirsAdded_SeparateAxis.png", width = 14, height = 6, units="in", res=300)
+png(filename="ExampleCrossSection_ReservoirsAdded_SeparateAxis_Rectangles.png", width = 14, height = 6, units="in", res=300)
+par(mgp=c(2.5,0.8,0), mar = c(5,4,4,5))
+plot(XSA_sort$Length, XSA_sort$D100C_Pred, type = 'l', xlim=c(0,1100), ylim = c(8000, -500), main=expression(paste("Depth to 100 ",degree,"C Along Cross Section A-A'")), xlab="Distance (km)", ylab="Depth (m)", lwd=2, cex.lab=1.8, cex.axis=1.8,cex.main=1.5)
+axis(1, at=seq(100,1100,200), labels=seq(100,1100,200), cex.axis=1.8)
+minor.tick(nx=4, ny=2, tick.ratio=0.5)
+par(new=T)
+ErrorBarXC2(CrossSec=XSA_sort, PredVar="D100C_Pred", ErrVar="D100C_Err", xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500, IntBoundLen=0.25, IntBoundNames="WormSect", LinWidBound=1, BoundExtend=0.1)
+StateName = c('West Virginia', '', 'Pennsylvania', 'New York')
+NameStates(XSA_sort, StateName, -450, -400, 50, 300, "A", 1.5)
+text(x=(XSA_sort$Length[which(XSA_sort$STATEFP == 24)][1]+XSA_sort$Length[which(XSA_sort$STATEFP == 42)][1])/2, y=-600, "MD", cex=0.85)
+legend(-70,5500,legend=c(expression(paste('Predicted Mean (',hat(mu),")")), expression(paste(hat(mu) %+-% 2, "SE")), "Interpolation Boundary"), lty=c(1,2,2), lwd=c(2,2,1), col=c('black','red','black'), bty="n", cex=1.5, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', Depth = 'ResDepthm', FormThick = 'FmnThickm', NewAxis = 1, Rects=1, yResBot=4000, yResTop=0, xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
+dev.off()
+
+
+png(filename="ExampleCrossSection_ReservoirsAdded_SeparateAxis_Points.png", width = 14, height = 6, units="in", res=300)
 par(mgp=c(2.5,0.8,0), mar = c(5,4,4,5))
 plot(XSA_sort$Length, XSA_sort$D100C_Pred, type = 'l', xlim=c(0,1100), ylim = c(8000, -500), main=expression(paste("Depth to 100 ",degree,"C Along Cross Section A-A'")), xlab="Distance (km)", ylab="Depth (m)", lwd=2, cex.lab=1.8, cex.axis=1.8,cex.main=1.5)
 axis(1, at=seq(100,1100,200), labels=seq(100,1100,200), cex.axis=1.8)
