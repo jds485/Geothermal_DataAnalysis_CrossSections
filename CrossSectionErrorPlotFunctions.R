@@ -438,25 +438,32 @@ dev.off()
 #The rectangle option can likely be improved by recording the joints of the lines as points, and then when the reservoir terminates, use lines() to connect them all.
 #It's important to note that if this function is used along with the SortMixedIntegerBounds, the points that are switched will need to have their data switched back for the reservoirs to plot properly. Example below for important parameters.
 #Currently does not handle if there are two reservoirs at the same depth with different formation thicknesses 
-PlotReservoirs = function(CrossSec,           #Cross section name
-                          ResData,            #Database containing the reservoir information
-                          Res,                #Field used to indicate presence of a reservoir
-                          Thermal,            #Thermal field for plotting.
-                          Depth = NA,         #Field giving depth of reservoir (optional)
-                          FormThick = NA,     #Field for formation thickness (optional)
-                          NewAxis = NA,       #Indicates if a new depth axis should be made on side 4. (optional)
-                          Rects = 0,          #Indicates if reservoirs should be plotted as rectangles (1) or as blue/green points (0, default)
-                          yResBot = NA,       #Second y-axis value at bottom (optional)
-                          yResTop = 0,        #Second y-axis value at top (optional)
-                          colResTop = 'blue', #Color of the top of the reservoir for points option (Rects = 0)
-                          colResBot = 'green',#Color of the bottom of the reservoir for points option (Rects = 0)
-                          colMean = 'blue',   #Color indicating presence of a reservoir on the mean line
-                          transpar = 0.3,     #Transparency parameter for the rectangles
-                          xLimMin,            #x-axis start
-                          xLimMax,            #x-axis stop
-                          yLimBot,            #y-axis value at bottom
-                          yLimTop             #y-axis Value at top
+PlotReservoirs = function(CrossSec,                #Cross section name
+                          ResData,                 #Database containing the reservoir information
+                          Res,                     #Field used to indicate presence of a reservoir
+                          Thermal,                 #Thermal field for plotting.
+                          Depth = NA,              #Field giving depth of reservoir (optional)
+                          FormThick = NA,          #Field for formation thickness (optional)
+                          NewAxis = NA,            #Indicates if a new depth axis should be made on side 4. (optional)
+                          Rects = 0,               #Indicates if reservoirs should be plotted as rectangles (1) or as blue/green points (0, default)
+                          yResBot = NA,            #Second y-axis value at bottom (optional)
+                          yResTop = 0,             #Second y-axis value at top (optional)
+                          colResTop = 'blue',      #Color of the top of the reservoir for points option (Rects = 0)
+                          colResBot = 'green',     #Color of the bottom of the reservoir for points option (Rects = 0)
+                          colMean = 'blue',        #Color indicating presence of a reservoir on the mean line
+                          colResRectsField = NA,   #Field name to color rectangles by
+                          colResRects = NA,        #vector of colors for the rectangles in rgb().
+                          colSeps = NA,            #Vector of color separation values
+                          transpar = 0.3,          #Transparency parameter for the rectangles
+                          xLimMin,                 #x-axis start
+                          xLimMax,                 #x-axis stop
+                          yLimBot,                 #y-axis value at bottom
+                          yLimTop                  #y-axis Value at top
 ){
+  if (is.na(colResRectsField) == FALSE){
+    #Make the colors transparent
+    colors = adjustcolor(colResRects, alpha=transpar)
+  }
   RemResInds = NA
   if (is.na(Depth)){
     #This is for plotting the blue sections along the mean line.
@@ -512,8 +519,25 @@ PlotReservoirs = function(CrossSec,           #Cross section name
                 for (j in 1:length(ResSpot[Depth][,1])){
                   if (any((ResSpotCheck[Depth][,1] == ResSpot[Depth][j,1])) == FALSE){
                     #This reservoir has terminated. Plot it back to the ResSpot$Start location.
-                    par(new=T)
-                    rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                    if (is.na(colResRectsField) == FALSE){
+                      #Get the color for the reservoir field specified
+                      color = NA
+                      for (k in 1:length(colSeps)){
+                        if (ResSpot[colResRectsField][j,1] < colSeps[k]){
+                          color = colors[k]
+                          break
+                        }
+                        if (k == length(colSeps)){
+                          color = colors[k+1]
+                        }
+                      }
+                      par(new=T)
+                      rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=color)
+                    }
+                    else{
+                      par(new=T)
+                      rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                    }
                     #Remove this reservoir from ResSpot after loop concludes
                     if (length(RemResInds) > 1){
                       RemResInds = c(RemResInds, j)
@@ -554,8 +578,25 @@ PlotReservoirs = function(CrossSec,           #Cross section name
               #The reservoir could be continued from the previous set of reservoirs
               for (j in 1:length(ResSpot[Depth][,1])){
                 #This reservoir has terminated. Plot it back to the ResSpot$Start location.
-                par(new=T)
-                rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                if (is.na(colResRectsField) == FALSE){
+                  #Get the color for the reservoir field specified
+                  color = NA
+                  for (k in 1:length(colSeps)){
+                    if (ResSpot[colResRectsField][j,1] < colSeps[k]){
+                      color = colors[k]
+                      break
+                    }
+                    if (k == length(colSeps)){
+                      color = colors[k+1]
+                    }
+                  }
+                  par(new=T)
+                  rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=color)
+                }
+                else{
+                  par(new=T)
+                  rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                }
               }
             }
             #Set PlotBack to 0 and clear contents of ResSpot
@@ -639,8 +680,25 @@ PlotReservoirs = function(CrossSec,           #Cross section name
                 for (j in 1:length(ResSpot[Depth][,1])){
                   if (any((ResSpotCheck[Depth][,1] == ResSpot[Depth][j,1])) == FALSE){
                     #This reservoir has terminated. Plot it back to the ResSpot$Start location.
-                    par(new=T)
-                    rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                    if (is.na(colResRectsField) == FALSE){
+                      #Get the color for the reservoir field specified
+                      color = NA
+                      for (k in 1:length(colSeps)){
+                        if (ResSpot[colResRectsField][j,1] < colSeps[k]){
+                          color = colors[k]
+                          break
+                        }
+                        if (k == length(colSeps)){
+                          color = colors[k+1]
+                        }
+                      }
+                      par(new=T)
+                      rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=color)
+                    }
+                    else{
+                      par(new=T)
+                      rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                    }
                     #Remove this reservoir from ResSpot after loop concludes
                     if (length(RemResInds) > 1){
                       RemResInds = c(RemResInds, j)
@@ -680,8 +738,25 @@ PlotReservoirs = function(CrossSec,           #Cross section name
               #The reservoir could be continued from the previous set of reservoirs
               for (j in 1:length(ResSpot[Depth][,1])){
                 #This reservoir has terminated. Plot it back to the ResSpot$Start location.
-                par(new=T)
-                rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                if (is.na(colResRectsField) == FALSE){
+                  #Get the color for the reservoir field specified
+                  color = NA
+                  for (k in 1:length(colSeps)){
+                    if (ResSpot[colResRectsField][j,1] < colSeps[k]){
+                      color = colors[k]
+                      break
+                    }
+                    if (k == length(colSeps)){
+                      color = colors[k+1]
+                    }
+                  }
+                  par(new=T)
+                  rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=color)
+                }
+                else{
+                  par(new=T)
+                  rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                }
               }
             }
             #Clearly all reservoirs have terminated. Set PlotBack to 0 and clear contents of ResSpot.
@@ -791,6 +866,23 @@ rm(i)
 
 #Plot of the reservoirs
 #Use mar if a reservoir depth axis is to be added.
+png(filename="ExampleCrossSection_ReservoirsAdded_SingleAxis_Rectangles_Colors.png", width = 14, height = 6, units="in", res=300)
+par(mgp=c(2.5,0.8,0), mar = c(5,4,4,5))
+plot(XSA_sort$Length, XSA_sort$D100C_Pred, type = 'l', xlim=c(0,1100), ylim = c(8000, -500), main=expression(paste("Depth to 100 ",degree,"C Along Cross Section A-A'")), xlab="Distance (km)", ylab="Depth (m)", lwd=2, cex.lab=1.8, cex.axis=1.8,cex.main=1.5)
+axis(1, at=seq(100,1100,200), labels=seq(100,1100,200), cex.axis=1.8)
+minor.tick(nx=4, ny=2, tick.ratio=0.5)
+par(new=T)
+ErrorBarXC2(CrossSec=XSA_sort, PredVar="D100C_Pred", ErrVar="D100C_Err", xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500, IntBoundLen=0.25, IntBoundNames="WormSect", LinWidBound=1, BoundExtend=0.1)
+StateName = c('West Virginia', '', 'Pennsylvania', 'New York')
+NameStates(XSA_sort, StateName, -450, -400, 50, 300, "A", 1.5)
+text(x=(XSA_sort$Length[which(XSA_sort$STATEFP == 24)][1]+XSA_sort$Length[which(XSA_sort$STATEFP == 42)][1])/2, y=-600, "MD", cex=0.85)
+legend(130,5800,legend=c(expression(paste('Predicted Mean (',hat(mu),")")), expression(paste(hat(mu) %+-% 2, "SE")), "Interpolation Boundary"), lty=c(1,2,2), lwd=c(2,2,1), col=c('black','red','black'), bty="n", cex=1.5, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
+legend(860,4300,legend=c("Reservoir RPI <0.01",  "0.01 - 0.1", "0.1 - 1.0", "1.0 - 10", expression(phantom(1)>="10")), pch=15, col=adjustcolor(c('red','orange','yellow','springgreen','green'), alpha=0.3), bty="n", cex=1.5, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
+legend(860,4300,legend=c("Reservoir RPI <0.01",  "0.01 - 0.1", "0.1 - 1.0", "1.0 - 10", expression(phantom(1)>="10")), pch=22, col='black', bty="n", cex=1.5, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'T1p5_Pred', Depth = 'ResDepthm', FormThick = 'FmnThickm', colResRectsField = 'RPI', colResRects=c('red','orange','yellow','springgreen','green'), colSeps = c(0.01,0.1,1,10),NewAxis = 1, Rects=1, yResBot=2200, yResTop=800, xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=0)
+dev.off()
+
 png(filename="ExampleCrossSection_ReservoirsAdded_SingleAxis_Rectangles.png", width = 14, height = 6, units="in", res=300)
 par(mgp=c(2.5,0.8,0), mar = c(5,4,4,5))
 plot(XSA_sort$Length, XSA_sort$D100C_Pred, type = 'l', xlim=c(0,1100), ylim = c(8000, -500), main=expression(paste("Depth to 100 ",degree,"C Along Cross Section A-A'")), xlab="Distance (km)", ylab="Depth (m)", lwd=2, cex.lab=1.8, cex.axis=1.8,cex.main=1.5)
