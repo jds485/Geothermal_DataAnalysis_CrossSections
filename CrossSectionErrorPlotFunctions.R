@@ -446,16 +446,18 @@ PlotReservoirs = function(CrossSec,                #Cross section name
                           FormThick = NA,          #Field for formation thickness (optional)
                           NewAxis = NA,            #Indicates if a new depth axis should be made on side 4. (optional)
                           Rects = 0,               #Indicates if reservoirs should be plotted as rectangles (1) or as blue/green points (0, default)
-                          yResBot = NA,            #Second y-axis value at bottom (optional)
-                          yResTop = NA,            #Second y-axis value at top (optional)
+                          yResBot = NA,            #Second y-axis value at bottom. Also used for plotting y-axis when sepResPlot is not NA (optional)
+                          yResTop = NA,            #Second y-axis value at top. Also used for plotting y-axis when sepResPlot is not NA (optional)
                           colResTop = 'blue',      #Color of the top of the reservoir for points option (Rects = 0)
                           colResBot = 'green',     #Color of the bottom of the reservoir for points option (Rects = 0)
                           colMean = 'blue',        #Color indicating presence of a reservoir on the mean line
                           colResRectsField = NA,   #Field name to color rectangles by
-                          colResRects = NA,        #vector of colors for the rectangles in rgb().
-                          colSeps = NA,            #Vector of color separation values
+                          colResRects = NA,        #vector or scalar of colors for the rectangles.
+                          colSeps = NA,            #Vector of numerical values that determine the color separation in colResRects.
                           transpar = 0.3,          #Transparency parameter for the rectangles
-                          sepResPlot = NA,         #Do you want a second plot for reservoirs on top of the temperature plot? Only possible to use when NewAxis is not requested.
+                          sepResPlot = NA,         #Do you want a second plot for reservoirs below the temperature plot? Only possible to use when NewAxis is NA.
+                          sepPlotCexAxis = 1.5,     #Character expansion for the axis on the reservoir only plot.
+                          sepPlotCexLab = 1.5,      #Character expansion for the labels on the reservoir only plot.
                           xLimMin,                 #x-axis start
                           xLimMax,                 #x-axis stop
                           yLimBot,                 #y-axis value at bottom
@@ -562,7 +564,7 @@ PlotReservoirs = function(CrossSec,                #Cross section name
                       }
                       else{
                         par(new=T)
-                        rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                        rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=adjustcolor(colResRects, alpha=transpar))
                       }
                       #Remove this reservoir from ResSpot after loop concludes
                       if (length(RemResInds) > 1){
@@ -621,7 +623,7 @@ PlotReservoirs = function(CrossSec,                #Cross section name
                   }
                   else{
                     par(new=T)
-                    rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                    rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yLimBot,yLimTop), xlab='', ylab='', col=adjustcolor(colResRects, alpha=transpar))
                   }
                 }
               }
@@ -702,7 +704,7 @@ PlotReservoirs = function(CrossSec,                #Cross section name
                 #Call a dummy plot to establish plotting position
                 if (PlotCount == 0){
                   #cex is larger than 1.8 because of the split plot.
-                  plot(-1000,-1000, xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='Distance (km)', ylab='Depth (m)', cex.axis=2, cex.lab = 2)
+                  plot(-1000,-1000, xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='Distance (km)', ylab='Reservoir Depth (m)', cex.axis=sepPlotCexAxis, cex.lab = sepPlotCexLab)
                   PlotCount = 1
                 }
                 #The reservoirs could go back to ResSpot$Start, but not all reservoirs have to continue. Check to see if all reservoirs in ResSpot exist here.
@@ -728,7 +730,7 @@ PlotReservoirs = function(CrossSec,                #Cross section name
                       }
                       else{
                         par(mfg=c(2,1))
-                        rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                        rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=adjustcolor(colResRects, alpha=transpar))
                       }
                       #Remove this reservoir from ResSpot after loop concludes
                       if (length(RemResInds) > 1){
@@ -787,7 +789,7 @@ PlotReservoirs = function(CrossSec,                #Cross section name
                   }
                   else{
                     par(mfg=c(2,1))
-                    rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                    rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=adjustcolor(colResRects, alpha=transpar))
                   }
                 }
               }
@@ -890,7 +892,7 @@ PlotReservoirs = function(CrossSec,                #Cross section name
                     }
                     else{
                       par(new=T)
-                      rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                      rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=adjustcolor(colResRects, alpha=transpar))
                     }
                     #Remove this reservoir from ResSpot after loop concludes
                     if (length(RemResInds) > 1){
@@ -948,7 +950,7 @@ PlotReservoirs = function(CrossSec,                #Cross section name
                 }
                 else{
                   par(new=T)
-                  rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=rgb(red=0.2, green=0.2, blue=1.0, alpha=transpar))
+                  rect(xleft = ResSpot$Start[j], xright = (i-2), ytop = ResSpot[Depth][j,1], ybottom = ResSpot[Depth][j,1]+ResSpot[FormThick][j,1], xlim=c(xLimMin, xLimMax), ylim = c(yResBot,yResTop), xlab='', ylab='', col=adjustcolor(colResRects, alpha=transpar))
                 }
               }
             }
@@ -1007,6 +1009,7 @@ PlotReservoirs = function(CrossSec,                #Cross section name
 #Example Reservoir cross section:
 
 #Load cross section
+setwd('C:/Users/Jared/Documents/Cornell/Research/Publications/DOE Grant/ThermalConductivity/Geothermal_DataAnalysis_CrossSections/Geothermal_DataAnalysis_CrossSections')
 XSA = readOGR(dsn=getwd(), layer="XSA_pts_ResInd", stringsAsFactors=FALSE)
 XSA_sort = XSA[do.call(order, XSA@data['POINT_Y']), ]
 XSA_sort$Length = 0
@@ -1088,7 +1091,7 @@ NameStates(XSA_sort, StateName, -450, -400, 50, 300, "A", 1.5)
 text(x=(XSA_sort$Length[which(XSA_sort$STATEFP == 24)][1]+XSA_sort$Length[which(XSA_sort$STATEFP == 42)][1])/2, y=-600, "MD", cex=0.85)
 legend(-70,5500,legend=c(expression(paste('Predicted Mean (',hat(mu),")")), expression(paste(hat(mu) %+-% 2, "SE")), "Interpolation Boundary"), lty=c(1,2,2), lwd=c(2,2,1), col=c('black','red','black'), bty="n", cex=1.5, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
 PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
-PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', Depth = 'ResDepthm', FormThick = 'FmnThickm', NewAxis = NA, Rects=1, yResBot=4000, yResTop=0, xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', Depth = 'ResDepthm', FormThick = 'FmnThickm', NewAxis = NA, Rects=1, colResRects = 'blue', yResBot=4000, yResTop=0, xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
 dev.off()
 
 png(filename="ExampleCrossSection_ReservoirsAdded_SingleAxis_Points.png", width = 14, height = 6, units="in", res=300)
@@ -1119,7 +1122,7 @@ NameStates(XSA_sort, StateName, -450, -400, 50, 300, "A", 1.5)
 text(x=(XSA_sort$Length[which(XSA_sort$STATEFP == 24)][1]+XSA_sort$Length[which(XSA_sort$STATEFP == 42)][1])/2, y=-600, "MD", cex=0.85)
 legend(-70,5500,legend=c(expression(paste('Predicted Mean (',hat(mu),")")), expression(paste(hat(mu) %+-% 2, "SE")), "Interpolation Boundary"), lty=c(1,2,2), lwd=c(2,2,1), col=c('black','red','black'), bty="n", cex=1.5, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
 PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
-PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', Depth = 'ResDepthm', FormThick = 'FmnThickm', NewAxis = 1, Rects=1, yResBot=4000, yResTop=0, xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', Depth = 'ResDepthm', FormThick = 'FmnThickm', NewAxis = 1, Rects=1, colResRects='blue', yResBot=4000, yResTop=0, xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
 dev.off()
 
 
@@ -1136,4 +1139,23 @@ text(x=(XSA_sort$Length[which(XSA_sort$STATEFP == 24)][1]+XSA_sort$Length[which(
 legend(-70,5500,legend=c(expression(paste('Predicted Mean (',hat(mu),")")), expression(paste(hat(mu) %+-% 2, "SE")), "Interpolation Boundary"), lty=c(1,2,2), lwd=c(2,2,1), col=c('black','red','black'), bty="n", cex=1.5, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
 PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
 PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', Depth = 'ResDepthm', FormThick = 'FmnThickm', NewAxis = 1, Rects=0, yResBot=4000, yResTop=0, xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500)
+dev.off()
+
+png(filename="ExampleCrossSection_ReservoirsAdded_SeparatePlot.png", width = 14, height = 6, units="in", res=300)
+par(mgp=c(2.5,0.8,0), mar = c(0,4.5,4,2.5), mfrow=c(2,1), xaxt="n")
+plot(XSA_sort$Length, XSA_sort$D100C_Pred, type = 'l', xlim=c(0,1100), ylim = c(8000, -500), main=expression(paste("Depth to 100 ",degree,"C and Reservoirs Along Cross Section A-A'")), xlab="", ylab='Depth (m)', lwd=2, cex.lab=1.5, cex.axis=1.5,cex.main=1.7)
+minor.tick(nx=4, ny=2, tick.ratio=0.5)
+par(mfg=c(1,1))
+ErrorBarXC2(CrossSec=XSA_sort, PredVar="D100C_Pred", ErrVar="D100C_Err", xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500, IntBoundLen=0.25, IntBoundNames="WormSect", LinWidBound=1, BoundExtend=0.1)
+StateName = c('West Virginia', '', 'Pennsylvania', 'New York')
+NameStates(XSA_sort, StateName, -450, -400, 50, 300, "A", 1)
+text(x=(XSA_sort$Length[which(XSA_sort$STATEFP == 24)][1]+XSA_sort$Length[which(XSA_sort$STATEFP == 42)][1])/2, y=-600, "MD", cex=0.85)
+legend(-70,4500,legend=c(expression(paste('Predicted Mean (',hat(mu),")")), expression(paste(hat(mu) %+-% 2, "SE")), "Interpolation Boundary"), lty=c(1,2,2), lwd=c(2,2,1), col=c('black','red','black'), bty="n", cex=1.2, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500, sepResPlot=1)
+par(mar=c(4,4.5,0,2.5), xaxt='s')
+PlotReservoirs(CrossSec = XSA_sort, ResData = ResData, Res = 'ThickUncer', Thermal = 'D100C_Pred', Depth = 'ResDepthm', FormThick = 'FmnThickm', colResRectsField = 'RPI', colResRects=c('red','orange','yellow','springgreen','green'), colSeps = c(0.01,0.1,1,10), Rects=1, yResBot=2200, yResTop=800, xLimMin=0, xLimMax=1100, yLimBot=8000, yLimTop=-500, sepResPlot=1)
+axis(1, at=seq(100,1100,200), labels=seq(100,1100,200), cex.axis=1.5)
+minor.tick(nx=4, ny=2, tick.ratio=0.5)
+legend(940, 2000,legend=c("Reservoir RPI <0.01",  "0.01 - 0.1", "0.1 - 1.0", "1.0 - 10", expression(phantom(1)>="10")), pch=15, col=adjustcolor(c('red','orange','yellow','springgreen','green'), alpha=0.3), bty="n", cex=1.2, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
+legend(940, 2000,legend=c("Reservoir RPI <0.01",  "0.01 - 0.1", "0.1 - 1.0", "1.0 - 10", expression(phantom(1)>="10")), pch=22, col='black', bty="n", cex=1.2, seg.len=1.5, x.intersp = 0.5, y.intersp = 1.1)
 dev.off()
