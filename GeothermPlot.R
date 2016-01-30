@@ -16,7 +16,11 @@ MakeGeothermPlot = function(Wells,              #The well database
                             Trend = NA,         #Field name for trend.
                             ColRampDivs = NA,   #Number of color ramp divisions. 1 is least (one color only). Using length(Wells[,1]) will use the most colors.
                             ColRampCols,        #Vector or scalar of colors to use in the color ramp. e.g. c("red", "orange", "yellow", "green", "blue")
-                            ChartTitle = ''     #Title for the chart. Default is no title.
+                            ChartTitle = '',    #Title for the chart. Default is no title.
+                            LineWidth = 1,      #Line width of the geotherms.
+                            PlotBHT = 1,        #Should the BHT be plotted? 1 - yes, else - no.
+                            ColBHT = 'black',   #Color of the BHT points
+                            ColBase = 'black'   #Color of the basement dashes
 ){
   if (is.na(Trend) == FALSE){
     #Sort by latitude (column 7). One could have any trend represented here, instead of latitude, but for this county the major trend is sount-north.
@@ -38,23 +42,25 @@ MakeGeothermPlot = function(Wells,              #The well database
   
   for (i in 1:length(Wells[,1])){
     if (i == 1){
-      plot(y = Depths, x = as.numeric(Wells[i,(which(colnames(Wells)==StartTempField):length(Wells[1,]))]), ylim=c(MaxDepth,MinDepth), xlim=c(MinTemp, MaxTemp), type='l', lwd=1.5, col=color[i], xlab=expression(paste("Temperature (",degree,"C)")), ylab="Depth (m)", main=ChartTitle, cex.lab=1.5, cex.main=1.5, cex.axis=1.5)
+      plot(y = Depths, x = as.numeric(Wells[i,(which(colnames(Wells)==StartTempField):length(Wells[1,]))]), ylim=c(MaxDepth,MinDepth), xlim=c(MinTemp, MaxTemp), type='l', lwd=LineWidth, col=color[i], xlab=expression(paste("Temperature (",degree,"C)")), ylab="Depth (m)", main=ChartTitle, cex.lab=1.5, cex.main=1.5, cex.axis=1.5)
       par(new=TRUE)
     }
     else{
-      plot(y = Depths, x = as.numeric(Wells[i,(which(colnames(Wells)==StartTempField):length(Wells[1,]))]), ylim=c(MaxDepth,MinDepth), xlim=c(MinTemp, MaxTemp), type='l', lwd=1.5, col=color[i], xlab="", ylab="", axes=FALSE)
+      plot(y = Depths, x = as.numeric(Wells[i,(which(colnames(Wells)==StartTempField):length(Wells[1,]))]), ylim=c(MaxDepth,MinDepth), xlim=c(MinTemp, MaxTemp), type='l', lwd=LineWidth, col=color[i], xlab="", ylab="", axes=FALSE)
       par(new=TRUE)
     }
     if (i == length(Wells[,1])){
       #Plot the basement depth on top of the geotherms
       if (is.na(BasementDepth) == FALSE){
         for (j in 1:length(Wells[,1])){
-          plot(y = Wells[BasementDepth][j,1], x = as.numeric(Wells[j,(which(colnames(Wells)==StartTempField)-1+round(Wells[BasementDepth][j,1]/10))]), ylim=c(MaxDepth,MinDepth), xlim=c(MinTemp, MaxTemp), pch='-', cex=1.5, xlab='', ylab='', axes=FALSE)
+          plot(y = as.numeric(Wells[BasementDepth][j,1]), x = as.numeric(Wells[j,(which(colnames(Wells)==StartTempField)-1+round(as.numeric(Wells[BasementDepth][j,1])/10))]), ylim=c(MaxDepth,MinDepth), xlim=c(MinTemp, MaxTemp), col=ColBase, pch='-', cex=1.5, xlab='', ylab='', axes=FALSE)
           par(new=TRUE)
         }
       }
       #Plot the BHTs on top of the geotherms
-      plot(y = Wells[WellDepth][,1], x = Wells[BHT][,1], ylim=c(MaxDepth,MinDepth), xlim=c(MinTemp, MaxTemp), pch=16, xlab='', ylab='', axes=FALSE)
+      if (PlotBHT == 1){
+        plot(y = as.numeric(Wells[WellDepth][,1]), x = as.numeric(Wells[BHT][,1]), ylim=c(MaxDepth,MinDepth), xlim=c(MinTemp, MaxTemp), col = ColBHT, pch=16, xlab='', ylab='', axes=FALSE)
+      }
       par(new=FALSE)
     }
   }
