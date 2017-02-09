@@ -1,5 +1,5 @@
 #These functions are used to sort data into a set in which all points have a unique spatial location.
-#The SameSpot function takes the data and returns a dataframe of the records in the same spatial location
+#The SameSpot function takes the data and returns an indexed dataframe of the records in the same spatial location
 #The SortingWells function sorts this dataframe and returns a dataframe in which all points have a unique spatial location.
 #Note that only the deepest records are retained for analysis, for quality reasons. 
 #Other methods, such as computation of surface heat flow using intervals where the BHTs are known is also possible, 
@@ -9,9 +9,9 @@
 #In this case, the BHTs that are within some censor temperature (say CensorTemp = 2 for BHTs that are 2 degrees C different) 
 #at the same depth are averaged, and a dataset called RerunWells is saved. It is up to the user how to handle this data. 
 #The option to completely censor this data is available by setting CensorTemp = 0
-#To avoid these complications as much as possible, it is recommended that the well database is sorted for quality control prior to using this code.
+#To avoid these complications as much as possible, it is recommended that the well database is quality controled prior to using these functions.
 
-SameSpot = function(Data    #The well data to be checked for wells with duplicate locations.
+SameSpot = function(Data    #The projected spatial data to be checked for wells with duplicate spatial locations.
 ){
   #Find records in the same spatial location.
   SameSpot = zerodist(Data)
@@ -24,15 +24,17 @@ SameSpot = function(Data    #The well data to be checked for wells with duplicat
   #The columns are the unique indexes. 
   colnames(StoreData_Frame) = Sorted
   
-  #Empty vector for storing the index of wells in the sorted data.
+  #Empty vector for storing the index of other wells in the sorted data that have the same spot as the well being checked.
   IndexOtherWells = vector("numeric")
   
   #Run through all unique records to find wells in the same spatial location.
-  for (i in 1:length(unique(c(SameSpot[,1], SameSpot[,2])))){
+  for (i in 1:length(Sorted)){
     #Store the index of the wells in the same spot for this number
     IndexSpots = which(SameSpot == Sorted[i])
     #Find the corresponding index of the other wells in that spot
     for (j in 1:length(IndexSpots)){
+      #The indices are in 2 columns. Need to treat the columns differently to extract the "other" record, which is in the same row, but the other column.
+      #Each index of "other" wells is half the length of SameSpot away
       if (IndexSpots[j] > length(SameSpot)/2){
         IndexOtherWells[j] = IndexSpots[j] - length(SameSpot)/2
       }
@@ -160,7 +162,7 @@ SortingWells = function(SameSpot,            #Output SameSpot from the SameSpot 
             }
           }
           else{
-            print("Error: BHTs at same depth are different. Taking average BHT for these wells. Thermal model results should be rerun for these.")
+            print("BHTs at the same depth for a spatial location are different. Taking average BHT for these wells. Thermal model results should be rerun for these wells.")
             countSameBHTs = countSameBHTs + 1
             #Take only every other record because these are identified as 2 records. Only 1 record should be retained.
             if (countSameBHTs %% 2 == 1){
@@ -220,19 +222,20 @@ SortingWells = function(SameSpot,            #Output SameSpot from the SameSpot 
 require(rgdal)
 
 
-#Example Data
-setwd()
-Data = readOGR(dsn=getwd(), layer = "AASG_BHTsForNY", stringsAsFactors=FALSE)
+# Example use of the functions
+#Data = readOGR(dsn=getwd(), layer = "AASG_BHTsForNY", stringsAsFactors=FALSE)
 
-#Simple quality control:
-#Remove the negative BHT wells before the sorting of wells in the same spatial locations:
-DataAll = Data[-which(Data$BHT < 0),]
+# Simple quality control:
+# Remove the negative BHT wells before the sorting of wells in the same spatial locations:
+#DataAll = Data[-which(Data$BHT < 0),]
 
-#Determine unique spatial locations
-Same = SameSpot(DataAll)
-SortData = SortingWells(SameSpot = Same$SameSpot, StoreData_Frame = Same$StoreData_Frame, DataAll = DataAll, BHT = 'BHT', TrueVertDepth = 'TruVrtc', DrillerDepth = 'DrllrTt', DepthOfMeasurement = 'DpthOfM', WellDepth = 'WellDepth', CensorTemp = 2)
-write.csv(SortData$Sorted, "ExampleSortedUniqueSpots_AASG_NY.csv")
-write.csv(SortData$RerunWells, "ExampleRerunWells_AASG_NY.csv")
-write.csv(SortData$Removed, "ExampleRemovedWells_AASG_NY.csv")
+# Determine unique spatial locations
+#Same = SameSpot(DataAll)
+#SortData = SortingWells(SameSpot = Same$SameSpot, StoreData_Frame = Same$StoreData_Frame, DataAll = DataAll, BHT = 'BHT', TrueVertDepth = 'TruVrtc', DrillerDepth = 'DrllrTt', DepthOfMeasurement = 'DpthOfM', WellDepth = 'WellDepth', CensorTemp = 2)
 
-#The wells that are listed in RerunWells are the last rows in ExampleSortedUniqueSopts.csv.
+# Save data
+#write.csv(SortData$Sorted, "ExampleSortedUniqueSpots_AASG_NY.csv")
+#write.csv(SortData$RerunWells, "ExampleRerunWells_AASG_NY.csv")
+#write.csv(SortData$Removed, "ExampleRemovedWells_AASG_NY.csv")
+
+#The wells that are listed in RerunWells are the last rows in ExampleSortedUniqueSopts_AASG_NY.csv.
