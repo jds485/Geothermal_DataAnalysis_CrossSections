@@ -73,17 +73,39 @@ SortingWells = function(SameSpot,            #Output SameSpot from the SameSpot 
     DataAll$DrillerDepth = 0
     print("Making column for DrillerDepth with values equal to 0")
   }
+  #Vector for BHTs are the same depth that are different 
   IndsDifferent = vector("numeric")
+  #Vector for BHTs that were averaged and have to be re-run
   IndsBHTDiff = vector("numeric")
+  #Vector for storing wells that are greater than CensorTemp apart at the same depth
+  IndsCensTemp = vector("numeric")
+  #Vector for indices for which the deeper record has a smaller temperature than the shallower record
+  IndsDeepSmallerBHT = vector("numeric")
+  #Counter for BHTs that are the same at depth
   countSameBHTs = 0
+  #Storing Averaged Wells
+  AvgRecord = DataAll[1,]
+  AvgRecord@data[1,1] = NA
   #Loop through the unique records and find wells in the same spot.
   for (i in 1:length(unique(c(SameSpot[,1], SameSpot[,2])))){
     #Gather all wells in the same spatial location as the current well.
     Indxs = as.numeric(colnames(StoreData_Frame[which(StoreData_Frame[i,] == 1)]))
     Wells = DataAll[Indxs,]
     
-    #Take only the deepest well. Find the index of the max well depth.
+    #Find the index of the max well depth.
     index_maxDepth = which(max(Wells@data[WellDepth][,1]) == Wells@data[WellDepth][,1])
+    
+    #Check if the deeper wells have a greater temperature than the shallower wells
+    #Check that there is a deep and shallow well, rather than only wells at the same depth
+    if (nrow(Wells[-index_maxDepth,]) >= 1){
+      for (temp in 1:length(index_maxDepth)){
+        if (any(Wells$BHT[index_maxDepth[temp]] < Wells$BHT[-index_maxDepth])){
+          IndsDeepSmallerBHT = c(IndsDeepSmallerBHT, Indxs[index_maxDepth[temp]])
+        }
+      }
+    }
+    
+    #Take only the deepest well.
     if (length(index_maxDepth) == 1) {
       #There's only one entry with a maximum depth. Retain only this well, and drop the others.
       #Add the removed wells to the Removed list.
@@ -131,9 +153,9 @@ SortingWells = function(SameSpot,            #Output SameSpot from the SameSpot 
         DoM = Wells_MaxDepth@data[DepthOfMeasurement][,1]
         Drillz = Wells_MaxDepth@data[DrillerDepth][,1]
         Truez = Wells_MaxDepth@data[TrueVertDepth][,1]
-        #Of the wells that have temperatures within CensorTemp of each other, retain the record that matches the depth of measurement the closest. 
+        #Of the wells that have temperatures within CensorTemp of each other, retain the record that matches the depth of measurement for the maximum depth the closest. 
         if (max(BHTs) - min(BHTs) <= CensorTemp){
-          if (((DoM[1] > Truez) && (Truez != 0)) || ((DoM[1] > Drillz) && (Drillz != 0))){
+          if (((DoM[1] > Truez) && (Truez > 0)) || ((DoM[1] > Drillz) && (Drillz > 0))){
             #The max BHT should correspond to the deeper measurement (DoM), so retain the well with the greater BHT.
             #There could be more than one record with the max BHT, so take only the first one because it would have the same depth.
             if (i == 1) {
@@ -147,7 +169,7 @@ SortingWells = function(SameSpot,            #Output SameSpot from the SameSpot 
               IndsRetained = c(IndsRetained,Indxs[index_maxDepth[which(BHTs == max(BHTs))][1]])
             }
           }
-          else if (((DoM[1] < Truez) && (Truez != 0)) || ((DoM[1] < Drillz) && (Drillz != 0))){
+          else if (((DoM[1] < Truez) && (Truez > 0)) || ((DoM[1] < Drillz) && (Drillz > 0))){
             #The well with the smaller BHT should be retained to match the DoM.
             #Again, take only the first one because it would have the same depth.
             if (i == 1) {
@@ -162,7 +184,7 @@ SortingWells = function(SameSpot,            #Output SameSpot from the SameSpot 
             }
           }
           else{
-            print("BHTs at the same depth for a spatial location are different. Taking average BHT for these wells. Thermal model results should be rerun for these wells.")
+            print("BHTs within CensorTemp at the same depth for a spatial location are different. Taking average BHT for these wells. Thermal model results should be rerun for these wells.")
             countSameBHTs = countSameBHTs + 1
             #Take only every other record because these are identified as 2 records. Only 1 record should be retained.
             if (countSameBHTs %% 2 == 1){
@@ -201,21 +223,28 @@ SortingWells = function(SameSpot,            #Output SameSpot from the SameSpot 
           if (i == 1) {
             Removed = Wells
             IndsRemoved = Indxs
+            IndsCensTemp = Indxs
           }
           else {
             Removed = rbind(Removed, Wells)
             IndsRemoved = c(IndsRemoved, Indxs)
+            IndsCensTemp = c(IndsCensTemp, Indxs)
           }
         }
       }
     }
   }
   #New dataset of sorted wells. Also add the averaged records to this dataset.
-  Sorted = rbind(DataAll[-unique(IndsRemoved),], AvgRecord)
-  #Wells that need to be rerun. These are the last countSameBHTs/2 wells in Sorted.
-  RerunWells = Sorted[(length(Sorted) - countSameBHTs/2 + 1):length(Sorted),]
+  if (!is.na(AvgRecord@data[1,1])){
+    Sorted = rbind(DataAll[-unique(IndsRemoved),], AvgRecord)
+    #Wells that need to be rerun. These are the last countSameBHTs/2 wells in Sorted.
+    RerunWells = Sorted[(length(Sorted) - countSameBHTs/2 + 1):length(Sorted),]
+  }else{
+    Sorted = DataAll[-unique(IndsRemoved),]
+    RerunWells = NA
+  }
   #List of data to return.
-  ReturnData = list(IndsRemoved=IndsRemoved, IndsRetained=IndsRetained, IndsDifferent=IndsDifferent, Removed=Removed, Sorted=Sorted, RerunWells=RerunWells, IndsBHTDiff=IndsBHTDiff)
+  ReturnData = list(IndsRemoved=IndsRemoved, IndsRetained=IndsRetained, IndsDifferent=IndsDifferent, Removed=Removed, Sorted=Sorted, RerunWells=RerunWells, IndsBHTDiff=IndsBHTDiff, IndsDeepSmallerBHT=IndsDeepSmallerBHT, IndsCensTemp = IndsCensTemp)
   return(ReturnData)
 }
 
